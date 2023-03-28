@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 28-Mar-2023 at 18:43:34 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>D:\Program Files\Java\jdk1.8.0_211</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "1.0.0", "py": "1.11.0", "pytest": "7.1.2"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.22000-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "3.1.1", "metadata": "2.0.1", "repeat": "0.9.1"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.9.7</td></tr></table>
+    <h2>Summary</h2>
+    <p>3 tests ran in 129.72 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">3 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_case/test_3.py::test_start</td>
+          <td class="col-duration">54.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stderr setup------------------------------ <br/>[18:41:24][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP wait-for-device
+[18:41:24][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.build.version.sdk
+[18:41:24][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys activity top
+[18:41:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.open.pocoservice
+[18:41:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:15771 tcp:10080
+[18:41:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:12032 tcp:10081
+[18:41:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent KEYCODE_WAKEUP
+[18:41:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+[18:41:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+[18:41:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell monkey -p com.mihoyo.hyperion -c android.intent.category.LAUNCHER 1
+<br/> -------------------------------Captured log setup------------------------------- <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP wait-for-device
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.build.version.sdk
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys activity top
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.open.pocoservice
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:15771 tcp:10080
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:12032 tcp:10081
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent KEYCODE_WAKEUP
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell monkey -p com.mihoyo.hyperion -c android.intent.category.LAUNCHER 1<br/> ------------------------------Captured stdout call------------------------------ <br/>start...
+end...
+<br/> ------------------------------Captured stderr call------------------------------ <br/>[18:41:30][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/rotationwatcher.jar
+[18:41:30][DEBUG]&lt;airtest.core.android.rotation&gt; install_rotationwatcher skipped
+[18:41:30][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/rotationwatcher.jar /data/local/tmp com.example.rotationwatcher.Main
+[18:41:30][DEBUG]&lt;airtest.utils.nbsp&gt; [rotation_server]b&#x27;0&#x27;
+[18:41:31][INFO]&lt;airtest.core.android.rotation&gt; update orientation None-&gt;0
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell wm size
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.sf.lcd_density
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys SurfaceFlinger
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys input
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getevent -p
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/maxpresent.jar
+[18:41:31][DEBUG]&lt;airtest.core.android.touch_methods.maxtouch&gt; install_maxtouch skipped
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:17455 localabstract:maxpresent_17455
+[18:41:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/maxpresent.jar /data/local/tmp com.netease.maxpresent.MaxPresent socket maxpresent_17455
+[18:41:32][DEBUG]&lt;airtest.utils.nbsp&gt; [airtouch_server]b&#x27;Metrics Message : 3040.0=====1440.0&#x27;
+[18:41:32][DEBUG]&lt;airtest.utils.nbsp&gt; [airtouch_server]b&#x27;Start local socket (maxpresent_17455) server...&#x27;
+<br/> -------------------------------Captured log call-------------------------------- <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/rotationwatcher.jar
+DEBUG    airtest.core.android.rotation:rotation.py:49 install_rotationwatcher skipped
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/rotationwatcher.jar /data/local/tmp com.example.rotationwatcher.Main
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [rotation_server]b&#x27;0&#x27;
+INFO     airtest.core.android.rotation:rotation.py:151 update orientation None-&gt;0
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell wm size
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.sf.lcd_density
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys SurfaceFlinger
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys input
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getevent -p
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/maxpresent.jar
+DEBUG    airtest.core.android.touch_methods.maxtouch:maxtouch.py:37 install_maxtouch skipped
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:17455 localabstract:maxpresent_17455
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/maxpresent.jar /data/local/tmp com.netease.maxpresent.MaxPresent socket maxpresent_17455
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [airtouch_server]b&#x27;Metrics Message : 3040.0=====1440.0&#x27;
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [airtouch_server]b&#x27;Start local socket (maxpresent_17455) server...&#x27;<br/> ----------------------------Captured stderr teardown---------------------------- <br/>[18:42:16][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am force-stop com.mihoyo.hyperion
+<br/> -----------------------------Captured log teardown------------------------------ <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am force-stop com.mihoyo.hyperion<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_case/test_4.py::test_start</td>
+          <td class="col-duration">16.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stderr setup------------------------------ <br/>[18:42:18][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP wait-for-device
+[18:42:18][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.build.version.sdk
+[18:42:18][WARNING]&lt;airtest.core.api&gt; Device:RFCM80422EP updated &lt;airtest.core.android.android.Android object at 0x000001C589006A00&gt; -&gt; &lt;airtest.core.android.android.Android object at 0x000001C589006C70&gt;
+[18:42:18][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys activity top
+[18:42:19][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.open.pocoservice
+[18:42:19][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:12151 tcp:10080
+[18:42:19][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:14305 tcp:10081
+[18:42:19][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent KEYCODE_WAKEUP
+[18:42:19][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+[18:42:19][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+[18:42:19][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell monkey -p com.mihoyo.hyperion -c android.intent.category.LAUNCHER 1
+<br/> -------------------------------Captured log setup------------------------------- <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP wait-for-device
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.build.version.sdk
+WARNING  airtest.core.api:helper.py:41 Device:RFCM80422EP updated &lt;airtest.core.android.android.Android object at 0x000001C589006A00&gt; -&gt; &lt;airtest.core.android.android.Android object at 0x000001C589006C70&gt;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys activity top
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.open.pocoservice
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:12151 tcp:10080
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:14305 tcp:10081
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent KEYCODE_WAKEUP
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell monkey -p com.mihoyo.hyperion -c android.intent.category.LAUNCHER 1<br/> ------------------------------Captured stdout call------------------------------ <br/>start...
+end...
+<br/> ------------------------------Captured stderr call------------------------------ <br/>[18:42:23][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/rotationwatcher.jar
+[18:42:23][DEBUG]&lt;airtest.core.android.rotation&gt; install_rotationwatcher skipped
+[18:42:23][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/rotationwatcher.jar /data/local/tmp com.example.rotationwatcher.Main
+[18:42:23][DEBUG]&lt;airtest.utils.nbsp&gt; [rotation_server]b&#x27;0&#x27;
+[18:42:24][INFO]&lt;airtest.core.android.rotation&gt; update orientation None-&gt;0
+[18:42:24][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell wm size
+[18:42:24][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.sf.lcd_density
+[18:42:24][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys SurfaceFlinger
+[18:42:24][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys input
+[18:42:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getevent -p
+[18:42:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/maxpresent.jar
+[18:42:25][DEBUG]&lt;airtest.core.android.touch_methods.maxtouch&gt; install_maxtouch skipped
+[18:42:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:18386 localabstract:maxpresent_18386
+[18:42:25][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/maxpresent.jar /data/local/tmp com.netease.maxpresent.MaxPresent socket maxpresent_18386
+[18:42:25][DEBUG]&lt;airtest.utils.nbsp&gt; [airtouch_server]b&#x27;Metrics Message : 3040.0=====1440.0&#x27;
+[18:42:25][DEBUG]&lt;airtest.utils.nbsp&gt; [airtouch_server]b&#x27;Start local socket (maxpresent_18386) server...&#x27;
+<br/> -------------------------------Captured log call-------------------------------- <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/rotationwatcher.jar
+DEBUG    airtest.core.android.rotation:rotation.py:49 install_rotationwatcher skipped
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/rotationwatcher.jar /data/local/tmp com.example.rotationwatcher.Main
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [rotation_server]b&#x27;0&#x27;
+INFO     airtest.core.android.rotation:rotation.py:151 update orientation None-&gt;0
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell wm size
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.sf.lcd_density
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys SurfaceFlinger
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys input
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getevent -p
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/maxpresent.jar
+DEBUG    airtest.core.android.touch_methods.maxtouch:maxtouch.py:37 install_maxtouch skipped
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:18386 localabstract:maxpresent_18386
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/maxpresent.jar /data/local/tmp com.netease.maxpresent.MaxPresent socket maxpresent_18386
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [airtouch_server]b&#x27;Metrics Message : 3040.0=====1440.0&#x27;
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [airtouch_server]b&#x27;Start local socket (maxpresent_18386) server...&#x27;<br/> ----------------------------Captured stderr teardown---------------------------- <br/>[18:42:32][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am force-stop com.mihoyo.hyperion
+<br/> -----------------------------Captured log teardown------------------------------ <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am force-stop com.mihoyo.hyperion<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_case/test_5.py::test_start</td>
+          <td class="col-duration">59.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stderr setup------------------------------ <br/>[18:42:34][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP wait-for-device
+[18:42:34][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.build.version.sdk
+[18:42:35][WARNING]&lt;airtest.core.api&gt; Device:RFCM80422EP updated &lt;airtest.core.android.android.Android object at 0x000001C589006C70&gt; -&gt; &lt;airtest.core.android.android.Android object at 0x000001C589504BB0&gt;
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys activity top
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.open.pocoservice
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:12152 tcp:10080
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:17653 tcp:10081
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent KEYCODE_WAKEUP
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+[18:42:35][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell monkey -p com.mihoyo.hyperion -c android.intent.category.LAUNCHER 1
+<br/> -------------------------------Captured log setup------------------------------- <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP wait-for-device
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.build.version.sdk
+WARNING  airtest.core.api:helper.py:41 Device:RFCM80422EP updated &lt;airtest.core.android.android.Android object at 0x000001C589006C70&gt; -&gt; &lt;airtest.core.android.android.Android object at 0x000001C589504BB0&gt;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys activity top
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.open.pocoservice
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:12152 tcp:10080
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:17653 tcp:10081
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent KEYCODE_WAKEUP
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys window policy
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell monkey -p com.mihoyo.hyperion -c android.intent.category.LAUNCHER 1<br/> ------------------------------Captured stdout call------------------------------ <br/>start...
+end...
+<br/> ------------------------------Captured stderr call------------------------------ <br/>[18:42:38][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/rotationwatcher.jar
+[18:42:38][DEBUG]&lt;airtest.core.android.rotation&gt; install_rotationwatcher skipped
+[18:42:38][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/rotationwatcher.jar /data/local/tmp com.example.rotationwatcher.Main
+[18:42:39][DEBUG]&lt;airtest.utils.nbsp&gt; [rotation_server]b&#x27;0&#x27;
+[18:42:39][INFO]&lt;airtest.core.android.rotation&gt; update orientation None-&gt;0
+[18:42:39][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell wm size
+[18:42:40][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.sf.lcd_density
+[18:42:40][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys SurfaceFlinger
+[18:42:40][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys input
+[18:42:40][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getevent -p
+[18:42:40][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/maxpresent.jar
+[18:42:40][DEBUG]&lt;airtest.core.android.touch_methods.maxtouch&gt; install_maxtouch skipped
+[18:42:40][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:13121 localabstract:maxpresent_13121
+[18:42:40][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/maxpresent.jar /data/local/tmp com.netease.maxpresent.MaxPresent socket maxpresent_13121
+[18:42:40][DEBUG]&lt;airtest.utils.nbsp&gt; [airtouch_server]b&#x27;Metrics Message : 3040.0=====1440.0&#x27;
+[18:42:40][DEBUG]&lt;airtest.utils.nbsp&gt; [airtouch_server]b&#x27;Start local socket (maxpresent_13121) server...&#x27;
+[18:42:59][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.nie.yosemite
+[18:43:00][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell settings get secure default_input_method
+[18:43:00][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ime list -a
+[18:43:00][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;兼容图片贴&#x27;
+[18:43:00][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+[18:43:03][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;兼容图片贴&#x27;
+[18:43:03][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+[18:43:06][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;兼容图片贴&#x27;
+[18:43:06][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+[18:43:07][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;@&#x27;
+[18:43:07][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+[18:43:10][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;心外无物&#x27;
+[18:43:10][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+<br/> -------------------------------Captured log call-------------------------------- <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/rotationwatcher.jar
+DEBUG    airtest.core.android.rotation:rotation.py:49 install_rotationwatcher skipped
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/rotationwatcher.jar /data/local/tmp com.example.rotationwatcher.Main
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [rotation_server]b&#x27;0&#x27;
+INFO     airtest.core.android.rotation:rotation.py:151 update orientation None-&gt;0
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell wm size
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getprop ro.sf.lcd_density
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys SurfaceFlinger
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys input
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell getevent -p
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ls -l /data/local/tmp/maxpresent.jar
+DEBUG    airtest.core.android.touch_methods.maxtouch:maxtouch.py:37 install_maxtouch skipped
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP forward --no-rebind tcp:13121 localabstract:maxpresent_13121
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell app_process -Djava.class.path=/data/local/tmp/maxpresent.jar /data/local/tmp com.netease.maxpresent.MaxPresent socket maxpresent_13121
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [airtouch_server]b&#x27;Metrics Message : 3040.0=====1440.0&#x27;
+DEBUG    airtest.utils.nbsp:nbsp.py:37 [airtouch_server]b&#x27;Start local socket (maxpresent_13121) server...&#x27;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell dumpsys package com.netease.nie.yosemite
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell settings get secure default_input_method
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell ime list -a
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;兼容图片贴&#x27;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;兼容图片贴&#x27;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;兼容图片贴&#x27;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;@&#x27;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am broadcast -a ADB_INPUT_TEXT --es msg &#x27;心外无物&#x27;
+DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell input keyevent ENTER<br/> ----------------------------Captured stderr teardown---------------------------- <br/>[18:43:31][DEBUG]&lt;airtest.core.android.adb&gt; D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am force-stop com.mihoyo.hyperion
+<br/> -----------------------------Captured log teardown------------------------------ <br/>DEBUG    airtest.core.android.adb:adb.py:147 D:\ProgramData\Anaconda3\envs\SEU\Lib\site-packages\airtest\core\android\static\adb\windows\adb.exe -P 5037 -s RFCM80422EP shell am force-stop com.mihoyo.hyperion<br/></div></td></tr></tbody></table></body></html>
