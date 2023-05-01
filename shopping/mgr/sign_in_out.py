@@ -2,7 +2,7 @@ from django.http import JsonResponse
 
 from django.contrib.auth import authenticate, login, logout
 
-
+# 85340 zxz980109
 # 登录处理
 def signin(request):
     # 从 HTTP POST 请求中获取用户名、密码参数

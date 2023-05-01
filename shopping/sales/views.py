@@ -5,6 +5,7 @@ from django.http import HttpResponse
 # 导入 Customer
 from common.models import Commodity
 from django.http import JsonResponse
+from django.db.models import Q
 import json
 
 def listgoods(request):
@@ -16,3 +17,18 @@ def listgoods(request):
     retlist = list(qs)
 
     return JsonResponse({'ret': 0, 'retlist': retlist})
+
+
+def search(request):
+    sc = request.GET.get('search', None)
+
+    context = None
+
+    if sc:
+        print(sc)
+
+        goods = Commodity.objects.filter(Q(name__icontains=sc))
+
+        context = {'goods': goods}
+
+    return render(request, 'goods.html', context)

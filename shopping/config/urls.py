@@ -15,11 +15,22 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from django.contrib import staticfiles
+from django.contrib.staticfiles.urls import static
+from . import settings
+
 # from sales.views import listgoods
 from mgr import sign_in_out
+from sales import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/sales/', include('sales.urls')),
-    path('api/mgr/', include('mgr.urls'))
+    path('api/mgr/', include('mgr.urls')),
+    # path(r'search/', views.search)
 ]
+
+urlpatterns += staticfiles_urlpatterns()
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
