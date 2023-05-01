@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+
+
+
+<html lang="en">
+
+
+<head>
+
+
+   <meta charset="UTF-8">
+
+
+   <title>goods</title>
+
+
+</head>
+
+
+<body>
+
+
+   <form action="/api/sales/search/" >
+
+
+       <input type="text"
+
+
+                   name="search"
+
+
+                   placeholder="搜索商品..."
+
+
+                   required
+
+
+               >
+
+
+       <input type="submit" value="提交">
+
+
+   </form>
+
+
+   {% if goods %}
+
+
+   {% for good in goods %}
+
+
+
+
+       <li>{{ good.name }}</li>
+       <li>商品价格：￥{{good.price }}</li>
+       <li>剩余数量：{{ good.amount }}</li>
+       <img src="/media/{{ good.name }}.png" width="580" height = "480"/>
+
+
+
+
+
+   {% endfor %}
+
+
+   {% endif %}
+
+
+</body>
+
+
+</html>
