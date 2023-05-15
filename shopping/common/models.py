@@ -11,3 +11,5 @@ class Commodity(models.Model):
 
     # 剩余数量
     amount = models.CharField(max_length=200)
+
+    img = models.ImageField(upload_to='images/', default='default.png')

@@ -2,8 +2,8 @@
 import requests, pprint
 
 payload = {
-    'username': 'zxz',
-    'password': 'bb88014'
+    'username': '85340',
+    'password': 'zxz980109'
 }
 
 response = requests.post('http://localhost/api/mgr/signin',

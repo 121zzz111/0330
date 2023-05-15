@@ -38,11 +38,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'common.apps.CommonConfig',  # CommonConfig是common/apps.py文件中定义的一个应用配置的类
+    'rest_framework',  # drf框架
+    'corsheaders',  # 跨域APP
+    'sales'  # 自己的APP， 随着自己创建的APP名改变而改变
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # 添加跨域中间件
     'django.middleware.common.CommonMiddleware',
     #'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -51,6 +55,8 @@ MIDDLEWARE = [
     # admin界面语言本地化
     'django.middleware.locale.LocaleMiddleware',
 ]
+
+CORS_ORIGIN_ALLOW_ALL = True  # 允许所有源访问
 
 ROOT_URLCONF = 'config.urls'
 
@@ -135,5 +141,5 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/images/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media').replace('\\', '/')
